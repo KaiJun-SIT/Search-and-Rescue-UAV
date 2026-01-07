@@ -1,0 +1,39 @@
+# SAC configuration for larger 30x30 grid
+env:
+  grid_size: 30
+  sensor_radius: 3
+  initial_battery: 1000.0  # More battery for larger grid
+  battery_depletion_rate: 1.0
+  max_steps: 4500  # 30*30*5
+  num_targets: 3  # Multi-target scenario
+  target_priorities: [1.0, 1.5, 2.0]  # Different priorities
+  obstacle_density: 0.15
+  detection_probability: 0.95
+
+  # Rewards
+  reward_target_found: 1000.0
+  reward_new_coverage: 1.0
+  reward_time_penalty: -1.0
+  reward_battery_depleted: -500.0
+  reward_prob_gradient: 5.0
+
+training:
+  total_timesteps: 2000000  # More timesteps for complex scenario
+  n_envs: 1
+  feature_extractor: "standard"  # Larger network for complex task
+  features_dim: 256
+
+  # SAC specific
+  learning_rate: 0.0003
+  buffer_size: 200000
+  batch_size: 256
+  gamma: 0.99
+  tau: 0.005
+  ent_coef: "auto"
+  train_freq: 1
+  gradient_steps: 1
+
+  # Evaluation
+  eval_freq: 20000
+  n_eval_episodes: 10
+  checkpoint_freq: 100000

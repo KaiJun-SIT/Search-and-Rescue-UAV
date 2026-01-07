@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sar-rl"
+version = "0.1.0"
+description = "Deep RL for autonomous UAV search and rescue"
+authors = [{name = "SAR-RL Team"}]
+requires-python = ">=3.9"
+dependencies = [
+    "gymnasium>=0.29.0",
+    "stable-baselines3>=2.2.0",
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
