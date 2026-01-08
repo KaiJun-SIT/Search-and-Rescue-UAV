@@ -1,0 +1,39 @@
+# SAC configuration for 10x10 grid
+# SAC is great for exploration via entropy maximization!
+env:
+  grid_size: 10
+  sensor_radius: 3
+  initial_battery: 100.0
+  battery_depletion_rate: 1.0
+  max_steps: 500
+  num_targets: 1
+  obstacle_density: 0.1
+  detection_probability: 0.95
+
+  # Rewards
+  reward_target_found: 1000.0
+  reward_new_coverage: 1.0
+  reward_time_penalty: -1.0
+  reward_battery_depleted: -500.0
+  reward_prob_gradient: 5.0
+
+training:
+  total_timesteps: 500000
+  n_envs: 1  # SAC typically uses single env
+  feature_extractor: "compact"
+  features_dim: 128
+
+  # SAC specific
+  learning_rate: 0.0003
+  buffer_size: 100000
+  batch_size: 256
+  gamma: 0.99
+  tau: 0.005
+  ent_coef: "auto"  # Automatic entropy tuning - key for SAC!
+  train_freq: 1
+  gradient_steps: 1
+
+  # Evaluation
+  eval_freq: 10000
+  n_eval_episodes: 20
+  checkpoint_freq: 50000
