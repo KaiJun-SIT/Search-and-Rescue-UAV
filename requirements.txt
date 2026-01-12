@@ -26,3 +26,17 @@ pytest>=7.4.0
 black>=23.0.0
 mypy>=1.5.0
 ruff>=0.1.0
+
+# Optional: Real Drone Deployment
+# Uncomment based on your drone platform:
+
+# For Crazyflie drones
+# cflib>=0.1.25
+
+# For MAVLink drones (ArduPilot/PX4)
+# dronekit>=2.9.2
+# pymavlink>=2.4.40
+
+# For PyBullet physics simulation
+# gym-pybullet-drones>=1.0.0
+# pybullet>=3.2.5
