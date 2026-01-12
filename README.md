@@ -463,10 +463,42 @@ MIT License - See LICENSE file for details
 - [x] Baseline algorithms
 - [x] Training pipeline
 - [x] Evaluation framework
-- [ ] 3D environment support
-- [ ] Gym-Pybullet-Drones integration
-- [ ] Real drone deployment
-- [ ] Multi-agent coordination
+- [x] **3D environment support** ✨ NEW!
+- [x] **Gym-Pybullet-Drones integration** ✨ NEW!
+- [x] **Real drone deployment** ✨ NEW!
+- [x] **Multi-agent coordination** ✨ NEW!
+
+---
+
+## 🌟 Advanced Features
+
+This project now includes cutting-edge capabilities for real-world SAR deployment!
+
+### 🆕 3D Environment (`SAREnv3D`)
+- Full 3D navigation with altitude control
+- 27 actions (3×3×3 movement grid)
+- Altitude-dependent detection and battery costs
+- Example: `python examples/example_3d_env.py`
+
+### 🆕 Physics Simulation (`PyBulletSAREnv`)
+- Realistic aerodynamics via Gym-Pybullet-Drones
+- Multiple drone models (Crazyflie, Hummingbird)
+- Wind effects and thrust dynamics
+- Hardware validation before deployment
+
+### 🆕 Multi-Agent Coordination (`MultiAgentSAREnv`)
+- Coordinate 2-10 UAVs simultaneously
+- Shared coverage and belief maps
+- Collision avoidance and team rewards
+- Example: `python examples/example_multi_agent.py`
+
+### 🆕 Real Drone Deployment
+- Deploy trained agents on actual drones!
+- Supports: **Crazyflie 2.X**, **ArduPilot/PX4**, **Simulated**
+- Safety features and coordinate transformations
+- Example: `python examples/example_deployment.py`
+
+**📖 Full Guide:** See [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) for detailed documentation, examples, and deployment instructions.
 
 ---
 
