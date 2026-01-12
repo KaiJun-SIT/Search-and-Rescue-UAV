@@ -67,6 +67,8 @@ class SARMetricsCallback(BaseCallback):
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
+                # Extract scalar from numpy array for single environment
+                action = int(action) if hasattr(action, 'item') else action
                 obs, reward, terminated, truncated, info = self.eval_env.step(action)
                 done = terminated or truncated
                 episode_reward += reward
@@ -160,6 +162,8 @@ class BestModelCallback(BaseCallback):
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
+                # Extract scalar from numpy array for single environment
+                action = int(action) if hasattr(action, 'item') else action
                 obs, reward, terminated, truncated, info = self.eval_env.step(action)
                 done = terminated or truncated
 
