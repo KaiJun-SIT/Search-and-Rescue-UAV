@@ -5,6 +5,7 @@ Demonstrates altitude control and 3D search patterns.
 
 import sys
 from pathlib import Path
+import time
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -27,6 +28,7 @@ def main():
         sensor_radius=3,
         num_targets=2,
         initial_battery=200.0,  # More battery for 3D
+        render_mode="human",  # Enable visualization
     )
 
     env = SAREnv3D(config, max_altitude=5, altitude_sensor_range=2)
@@ -48,6 +50,12 @@ def main():
         # Random action
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
+
+        # Render the environment
+        env.render()
+
+        # Slow down so you can see what's happening
+        time.sleep(0.1)
 
         # Print status every 10 steps
         if step % 10 == 0:

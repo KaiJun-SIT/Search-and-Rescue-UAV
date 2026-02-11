@@ -78,7 +78,12 @@ class SARMetricsCallback(BaseCallback):
             episode_rewards.append(episode_reward)
             episode_lengths.append(episode_length)
             successes.append(1 if info["success"] else 0)
-            coverages.append(info["coverage"])
+            # PyBullet env may not have coverage metric
+            if "coverage" in info:
+                coverages.append(info["coverage"])
+            else:
+                # Use proportion of area visited as proxy (not available in PyBullet)
+                coverages.append(0.0)  # Placeholder
             battery_remaining.append(info["battery"])
 
             if info["success"]:

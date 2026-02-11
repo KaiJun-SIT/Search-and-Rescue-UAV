@@ -67,7 +67,7 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
         drone_models = {
             "cf2x": DroneModel.CF2X,
             "cf2p": DroneModel.CF2P,
-            "hb": DroneModel.HB,
+            "race": DroneModel.RACE,
         }
 
         # Map physics string to enum
@@ -88,8 +88,8 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
             initial_xyzs=np.array([[0, 0, 1]]),  # Start at 1m altitude
             initial_rpys=np.array([[0, 0, 0]]),
             physics=physics_types.get(physics, Physics.PYB),
-            freq=240,
-            aggregate_phy_steps=1,
+            pyb_freq=240,
+            ctrl_freq=240,
             gui=gui,
             record=record,
         )
@@ -106,13 +106,18 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
         # Define high-level action space (waypoint navigation)
         self.action_space = spaces.Discrete(9)  # 8 directions + hover
 
-        # Observation space (similar to 2D SAR but with physics state)
+        # Local observation size
+        self.obs_size = self.config.observation_size
+
+        # Observation space (compatible with SAR feature extractor)
+        # Note: position is 2D (x, y) to match standard SAR env, even though we track 3D internally
         self.observation_space = spaces.Dict(
             {
-                "position": spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32),
-                "velocity": spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32),
-                "orientation": spaces.Box(low=-np.pi, high=np.pi, shape=(3,), dtype=np.float32),
+                "position": spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32),
                 "battery": spaces.Box(low=0, high=100, shape=(1,), dtype=np.float32),
+                "local_occupancy": spaces.Box(
+                    low=0, high=1, shape=(self.obs_size, self.obs_size, 3), dtype=np.float32
+                ),
                 "coverage_map": spaces.Box(
                     low=0, high=1, shape=(self.grid_size, self.grid_size), dtype=np.float32
                 ),
@@ -194,15 +199,18 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
                 reward += self.config.reward_new_coverage
 
         # Check for target detection
-        for target_pos in self.target_positions[:]:
+        for i, target_pos in enumerate(self.target_positions[:]):
             distance = np.linalg.norm(drone_pos[:2] - target_pos[:2])
             if distance < 1.0:  # 1 meter detection range
                 if np.random.random() < self.config.detection_probability:
-                    idx = self.target_positions.index(target_pos)
-                    priority = self.config.target_priorities[idx]
+                    priority = self.config.target_priorities[i]
                     reward += self.config.reward_target_found * priority
                     self.targets_found += 1
-                    self.target_positions.remove(target_pos)
+                    # Find and remove this target by position match
+                    for j, t in enumerate(self.target_positions):
+                        if np.allclose(t, target_pos):
+                            self.target_positions.pop(j)
+                            break
 
         # Update belief map
         self._update_belief_map(drone_pos)
@@ -284,7 +292,7 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
 
         # Convert to RPM commands (very simplified)
         # In practice, use proper attitude control
-        rpm = np.array([16000, 16000, 16000, 16000])  # Hover RPMs
+        rpm = np.array([16000.0, 16000.0, 16000.0, 16000.0], dtype=np.float32)  # Hover RPMs
 
         # Add corrections based on vel_error (simplified)
         rpm[0] += vel_error[0] * 100
@@ -337,15 +345,47 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
         if total > 1e-10:
             self.belief_map /= total
 
+    def _get_local_occupancy(self, position: np.ndarray) -> np.ndarray:
+        """Get local occupancy grid around drone position.
+
+        Returns a local view of the environment around the drone.
+        Channels: 0=obstacles (none in this env), 1=visited cells, 2=current position
+        """
+        local_obs = np.zeros((self.obs_size, self.obs_size, 3), dtype=np.float32)
+
+        # Get grid position
+        grid_x, grid_y = self._world_to_grid(position[:2])
+
+        # Define local observation window
+        half_obs = self.obs_size // 2
+
+        # Fill in visited cells (channel 1)
+        for i in range(self.obs_size):
+            for j in range(self.obs_size):
+                world_x = grid_x - half_obs + i
+                world_y = grid_y - half_obs + j
+
+                if 0 <= world_x < self.grid_size and 0 <= world_y < self.grid_size:
+                    local_obs[j, i, 1] = self.coverage_map[world_y, world_x]
+
+        # Mark current position (channel 2)
+        local_obs[half_obs, half_obs, 2] = 1.0
+
+        return local_obs
+
     def _get_sar_observation(self) -> Dict[str, np.ndarray]:
         """Get SAR-specific observation."""
         drone_state = self._getDroneStateVector(0)
+        position_3d = drone_state[0:3]
 
+        # Get local occupancy
+        local_occupancy = self._get_local_occupancy(position_3d)
+
+        # Return 2D position (x, y) for compatibility with standard SAR feature extractor
         return {
-            "position": drone_state[0:3].astype(np.float32),
-            "velocity": drone_state[10:13].astype(np.float32),
-            "orientation": drone_state[7:10].astype(np.float32),
+            "position": position_3d[0:2].astype(np.float32),  # Only x, y
             "battery": np.array([self.battery_level], dtype=np.float32),
+            "local_occupancy": local_occupancy,
             "coverage_map": self.coverage_map.copy(),
             "belief_map": self.belief_map.copy(),
             "targets_found": np.array([self.targets_found], dtype=np.float32),
@@ -360,6 +400,73 @@ class PyBulletSAREnv(gym.Env if not PYBULLET_AVAILABLE else BaseAviary):
             "targets_remaining": len(self.target_positions),
             "success": self.targets_found >= self.config.num_targets,
         }
+
+    # Required BaseAviary abstract methods
+    def _actionSpace(self):
+        """Return the action space for BaseAviary.
+
+        We use RPM control for the 4 motors.
+        """
+        return spaces.Box(
+            low=0,
+            high=self.MAX_RPM,
+            shape=(1, 4),  # 1 drone, 4 motors
+            dtype=np.float32
+        )
+
+    def _observationSpace(self):
+        """Return the observation space for BaseAviary.
+
+        Returns raw PyBullet state (not used directly, we override with SAR obs).
+        """
+        return spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(20,),  # PyBullet state vector
+            dtype=np.float32
+        )
+
+    def _computeObs(self):
+        """Compute observation for BaseAviary.
+
+        This returns the raw PyBullet state, but we override in our SAR methods.
+        """
+        return self._getDroneStateVector(0)
+
+    def _preprocessAction(self, action):
+        """Preprocess action for BaseAviary.
+
+        Converts action to proper format for PyBullet.
+        """
+        return np.atleast_2d(action)
+
+    def _computeInfo(self):
+        """Compute info dict for BaseAviary.
+
+        Returns empty dict as we provide our own info in SAR methods.
+        """
+        return {}
+
+    def _computeReward(self):
+        """Compute reward for BaseAviary.
+
+        Returns 0 as we compute rewards in our SAR step method.
+        """
+        return 0.0
+
+    def _computeTerminated(self):
+        """Compute terminated flag for BaseAviary.
+
+        Returns False as we handle termination in our SAR step method.
+        """
+        return False
+
+    def _computeTruncated(self):
+        """Compute truncated flag for BaseAviary.
+
+        Returns False as we handle truncation in our SAR step method.
+        """
+        return False
 
 
 def create_pybullet_sar_env(
