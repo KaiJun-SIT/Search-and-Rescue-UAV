@@ -105,6 +105,7 @@ class SAREnv(gym.Env):
         # Rendering
         self.fig: Optional[plt.Figure] = None
         self.ax: Optional[plt.Axes] = None
+        self.colorbars: list = []  # Track colorbars to prevent stacking
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
@@ -455,6 +456,11 @@ class SAREnv(gym.Env):
         if self.fig is None:
             self.fig, self.ax = plt.subplots(1, 3, figsize=(15, 5))
 
+        # Remove old colorbars to prevent stacking/shrinking
+        for cbar in self.colorbars:
+            cbar.remove()
+        self.colorbars.clear()
+
         for ax in self.ax:
             ax.clear()
 
@@ -536,7 +542,8 @@ class SAREnv(gym.Env):
         ax.set_title("Coverage Map")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
-        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        self.colorbars.append(cbar)  # Track colorbar for removal
 
     def _render_belief(self, ax: plt.Axes) -> None:
         """Render the belief map."""
@@ -544,7 +551,8 @@ class SAREnv(gym.Env):
         ax.set_title("Belief Map (Target Probability)")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
-        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        self.colorbars.append(cbar)  # Track colorbar for removal
 
     def close(self) -> None:
         """Close the environment and cleanup."""
@@ -552,3 +560,4 @@ class SAREnv(gym.Env):
             plt.close(self.fig)
             self.fig = None
             self.ax = None
+            self.colorbars.clear()
