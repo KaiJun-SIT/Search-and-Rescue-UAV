@@ -155,10 +155,11 @@ class SpiralSearchAgent(BaselineAgent):
     """
 
     def __init__(self, grid_size: int, sensor_radius: int = 3, center: Optional[Tuple[int, int]] = None):
-        super().__init__(grid_size, sensor_radius)
+        # Set center before calling super().__init__() because super().__init__() calls reset()
         self.center = center or (grid_size // 2, grid_size // 2)
         self.path: List[Tuple[int, int]] = []
         self.path_index: int = 0
+        super().__init__(grid_size, sensor_radius)
 
     def reset(self) -> None:
         """Reset and generate spiral path."""
