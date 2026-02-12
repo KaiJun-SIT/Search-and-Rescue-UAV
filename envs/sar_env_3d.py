@@ -198,6 +198,9 @@ class SAREnv3D(gym.Env):
         self.step_count += 1
         reward = 0.0
 
+        # Convert numpy action to Python int for dictionary lookup
+        action = int(action)
+
         # Get 3D action delta
         dx, dy, dz = self.actions_3d[action]
         new_x = self.agent_pos[0] + dx

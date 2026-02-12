@@ -205,6 +205,9 @@ class MultiAgentSAREnv(gym.Env):
                 terminated[i] = True
                 continue
 
+            # Convert numpy action to Python int for dictionary lookup
+            action = int(action)
+
             # Get action delta
             dx, dy = self.ACTIONS[action]
             new_x = self.agent_positions[i][0] + dx
