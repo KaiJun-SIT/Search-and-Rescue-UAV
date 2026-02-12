@@ -17,7 +17,14 @@ from typing import Optional
 
 import gymnasium as gym
 import yaml
-from stable_baselines3 import PPO, SAC, TD3
+from stable_baselines3 import PPO, SAC, TD3, A2C
+try:
+    from stable_baselines3 import DQN
+    DQN_AVAILABLE = True
+except ImportError:
+    DQN = None
+    DQN_AVAILABLE = False
+
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecMonitor
@@ -100,6 +107,38 @@ def train(
     # Create evaluation environment
     eval_env = create_env(env_config)
 
+    # Check if algorithm supports the action space
+    test_env = create_env(env_config)
+    action_space = test_env.action_space
+
+    # Define which algorithms support which action spaces
+    discrete_only = ["DQN", "A2C"]
+    continuous_only = ["SAC", "TD3"]
+    both = ["PPO"]
+
+    from gymnasium.spaces import Discrete, Box
+
+    if isinstance(action_space, Discrete):
+        if algorithm in continuous_only:
+            print("\n" + "="*60)
+            print("❌ ERROR: Action Space Mismatch")
+            print("="*60)
+            print(f"Algorithm: {algorithm} only supports CONTINUOUS actions (Box)")
+            print(f"Your environment has: DISCRETE actions (Discrete({action_space.n}))")
+            print("\n💡 SOLUTION: Use an algorithm that supports discrete actions:")
+            print("   - PPO (Recommended for SAR tasks)")
+            print("   - A2C")
+            print("   - DQN" + (" (available)" if DQN_AVAILABLE else " (install: pip install stable-baselines3[extra])"))
+            print("\nTry running:")
+            print(f"  python training/train.py --algorithm PPO --grid-size {env_config['grid_size']} --timesteps {training_config.get('total_timesteps', 100000)}")
+            print("="*60 + "\n")
+            test_env.close()
+            env.close()
+            eval_env.close()
+            return
+
+    test_env.close()
+
     # Get policy kwargs
     policy_kwargs = create_policy_kwargs(
         extractor_type=training_config.get("feature_extractor", "compact"),
@@ -153,6 +192,38 @@ def train(
             policy_delay=training_config.get("policy_delay", 2),
             train_freq=training_config.get("train_freq", 1),
             gradient_steps=training_config.get("gradient_steps", 1),
+        )
+    elif algorithm == "A2C":
+        model = A2C(
+            **common_args,
+            learning_rate=training_config.get("learning_rate", 7e-4),
+            n_steps=training_config.get("n_steps", 5),
+            gamma=training_config.get("gamma", 0.99),
+            gae_lambda=training_config.get("gae_lambda", 1.0),
+            ent_coef=training_config.get("ent_coef", 0.0),
+            vf_coef=training_config.get("vf_coef", 0.5),
+            max_grad_norm=training_config.get("max_grad_norm", 0.5),
+        )
+    elif algorithm == "DQN":
+        if not DQN_AVAILABLE:
+            print("❌ DQN not available. Install with: pip install stable-baselines3[extra]")
+            env.close()
+            eval_env.close()
+            return
+
+        model = DQN(
+            **common_args,
+            learning_rate=training_config.get("learning_rate", 1e-4),
+            buffer_size=training_config.get("buffer_size", 100000),
+            learning_starts=training_config.get("learning_starts", 50000),
+            batch_size=training_config.get("batch_size", 32),
+            tau=training_config.get("tau", 1.0),
+            gamma=training_config.get("gamma", 0.99),
+            train_freq=training_config.get("train_freq", 4),
+            gradient_steps=training_config.get("gradient_steps", 1),
+            target_update_interval=training_config.get("target_update_interval", 10000),
+            exploration_fraction=training_config.get("exploration_fraction", 0.1),
+            exploration_final_eps=training_config.get("exploration_final_eps", 0.05),
         )
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
@@ -225,9 +296,9 @@ def main():
     parser.add_argument(
         "--algorithm",
         type=str,
-        choices=["PPO", "SAC", "TD3"],
+        choices=["PPO", "SAC", "TD3", "A2C", "DQN"],
         default="PPO",
-        help="RL algorithm to use",
+        help="RL algorithm to use (PPO/A2C/DQN for discrete, SAC/TD3 for continuous)",
     )
     parser.add_argument(
         "--config",
@@ -297,6 +368,20 @@ def main():
                 "batch_size": 64,
                 "n_epochs": 10,
                 "ent_coef": 0.01,
+            })
+        elif args.algorithm == "A2C":
+            training_config.update({
+                "n_steps": 5,
+                "learning_rate": 7e-4,
+            })
+        elif args.algorithm == "DQN":
+            training_config.update({
+                "buffer_size": 100000,
+                "batch_size": 32,
+                "learning_starts": 50000,
+                "train_freq": 4,
+                "target_update_interval": 10000,
+                "exploration_fraction": 0.1,
             })
         elif args.algorithm in ["SAC", "TD3"]:
             training_config.update({
